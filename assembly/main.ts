@@ -8,31 +8,24 @@ import {
 
 const len = 4
 
-export const pool = new PersistentDeque<string>('p')
-export const balance = new PersistentMap<string, string>('b')
+export const mappedPool = new PersistentMap<string, PersistentDeque<string>>(
+	'mp'
+)
 export const reward = new PersistentMap<string, string>('r')
 
-export function clearPool(): void {
-	for (let i = 0; i < pool.length; i++) {
-		pool.popFront()
-	}
-}
+// export function clearPool(): void {
+// 	for (let i = 0; i < pool.length; i++) {
+// 		pool.popFront()
+// 	}
+// }
 
-export function getPool(): string[] {
-	const data: string[] = []
-	for (let i = 0; i < pool.length; i++) {
-		data.push(pool[i])
-	}
-	return data
-}
-
-export function getBalance(userId: string): string {
-	const curBal = balance.get(userId)
-	if (curBal) {
-		return curBal.toString()
-	}
-	return '0'
-}
+// export function getPool(): string[] {
+// 	const data: string[] = []
+// 	for (let i = 0; i < pool.length; i++) {
+// 		data.push(pool[i])
+// 	}
+// 	return data
+// }
 
 export function getReward(userId: string): string {
 	const curBal = reward.get(userId)
@@ -56,13 +49,25 @@ export function piece(receiverId: string): void {
 	const value = context.attachedDeposit
 	const forOwner: u128 = u128.div10(u128.mul(value, u128.from(9)))
 	const forSupporter: u128 = u128.sub(value, forOwner)
-	if (pool.length > 0) {
-		ContractPromiseBatch.create(receiverId).transfer(forOwner)
-		disburse(forSupporter)
+	const poolId = getPoolId(receiverId)
+	const pool = mappedPool.get(poolId)
+	if (pool) {
+		if (pool.length > 0) {
+			ContractPromiseBatch.create(receiverId).transfer(forOwner)
+			disburse(pool, forSupporter)
+		} else {
+			ContractPromiseBatch.create(receiverId).transfer(value)
+		}
+		pool.pushFront(userId)
 	} else {
-		ContractPromiseBatch.create(receiverId).transfer(value)
+		const newPool = new PersistentDeque<string>(poolId)
+		newPool.pushFront(userId)
+		mappedPool.set(receiverId, newPool)
 	}
-	pool.pushFront(userId)
+}
+
+function getPoolId(userId: string): string {
+	return 'pool' + '::' + userId
 }
 
 function rewardAdd(userId: string, value: string): string {
@@ -85,7 +90,7 @@ function rewardSub(userId: string, value: string): string {
 	return newBal.toString()
 }
 
-function disburse(forSupporter: u128): void {
+function disburse(pool: PersistentDeque<string>, forSupporter: u128): void {
 	if (pool.length > 0) {
 		const rewardCount: i32 = pool.length > len ? len : pool.length
 		const pieceForSupporter = u128.div(forSupporter, u128.from(rewardCount))
