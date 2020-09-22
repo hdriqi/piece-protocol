@@ -5,6 +5,7 @@ import {
 	u128,
 	ContractPromiseBatch,
 	storage,
+	AVLTree,
 } from 'near-sdk-as'
 
 const len = 4
@@ -12,7 +13,7 @@ const len = 4
 export type Pool = PersistentDeque<string>
 export const mappedPool = new PersistentMap<string, Pool>('mp')
 export const mappedReward = new PersistentMap<string, string>('r')
-export const mappedProfile = new PersistentMap<string, Profile>('p')
+export const mappedProfile = new AVLTree<string, Profile>('p')
 
 @nearBindgen
 class Profile {
@@ -48,10 +49,7 @@ export function getOwner(): string {
 }
 
 export function setOwner(userId: string): boolean {
-	assert(
-		getOwner() == context.sender,
-		'[PieceProtocol] ONLY_OWNER'
-	)
+	assert(getOwner() == context.sender, '[PieceProtocol] ONLY_OWNER')
 	storage.set<string>(ownerKey, userId)
 	return true
 }
