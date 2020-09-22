@@ -27,6 +27,10 @@ export const reward = new PersistentMap<string, string>('r')
 // 	return data
 // }
 
+export function updateProfile() {
+
+}
+
 export function getReward(userId: string): string {
 	const curBal = reward.get(userId)
 	if (curBal) {
@@ -49,8 +53,7 @@ export function piece(receiverId: string): void {
 	const value = context.attachedDeposit
 	const forOwner: u128 = u128.div10(u128.mul(value, u128.from(9)))
 	const forSupporter: u128 = u128.sub(value, forOwner)
-	const poolId = getPoolId(receiverId)
-	const pool = mappedPool.get(poolId)
+	const pool = mappedPool.get(receiverId)
 	if (pool) {
 		if (pool.length > 0) {
 			ContractPromiseBatch.create(receiverId).transfer(forOwner)
@@ -60,13 +63,14 @@ export function piece(receiverId: string): void {
 		}
 		pool.pushFront(userId)
 	} else {
-		const newPool = new PersistentDeque<string>(poolId)
+		const poolKey = genPoolKey(receiverId)
+		const newPool = new PersistentDeque<string>(poolKey)
 		newPool.pushFront(userId)
 		mappedPool.set(receiverId, newPool)
 	}
 }
 
-function getPoolId(userId: string): string {
+function genPoolKey(userId: string): string {
 	return 'pool' + '::' + userId
 }
 
