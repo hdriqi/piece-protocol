@@ -1,14 +1,11 @@
-function getConfig(env) {
-  if (!process.env.CONTRACT_NAME) {
-    throw "[env] CONTRACT_NAME not found"
-  }
+function getConfig(env, contractName) {
   switch (env) {
     case 'production':
     case 'mainnet':
       return {
         networkId: 'mainnet',
         nodeUrl: 'https://rpc.mainnet.near.org',
-        contractName: process.env.CONTRACT_NAME,
+        contractName: contractName,
         walletUrl: 'https://wallet.mainnet.near.org',
         helperUrl: 'https://helper.mainnet.near.org',
       }
@@ -17,7 +14,7 @@ function getConfig(env) {
       return {
         networkId: 'default',
         nodeUrl: 'https://rpc.testnet.near.org',
-        contractName: process.env.CONTRACT_NAME,
+        contractName: contractName,
         walletUrl: 'https://wallet.testnet.near.org',
         helperUrl: 'https://helper.testnet.near.org',
       }
@@ -25,7 +22,7 @@ function getConfig(env) {
       return {
         networkId: 'devnet',
         nodeUrl: 'https://rpc.devnet.near.org',
-        contractName: process.env.CONTRACT_NAME,
+        contractName: contractName,
         walletUrl: 'https://wallet.devnet.near.org',
         helperUrl: 'https://helper.devnet.near.org',
       }
@@ -33,7 +30,7 @@ function getConfig(env) {
       return {
         networkId: 'betanet',
         nodeUrl: 'https://rpc.betanet.near.org',
-        contractName: process.env.CONTRACT_NAME,
+        contractName: contractName,
         walletUrl: 'https://wallet.betanet.near.org',
         helperUrl: 'https://helper.betanet.near.org',
       }
@@ -43,21 +40,21 @@ function getConfig(env) {
         nodeUrl: 'http://localhost:3030',
         keyPath: `${process.env.HOME}/.near/validator_key.json`,
         walletUrl: 'http://localhost:4000/wallet',
-        contractName: process.env.CONTRACT_NAME,
+        contractName: contractName,
       }
     case 'test':
     case 'ci':
       return {
         networkId: 'shared-test',
         nodeUrl: 'https://rpc.ci-testnet.near.org',
-        contractName: process.env.CONTRACT_NAME,
+        contractName: contractName,
         masterAccount: 'test.near',
       }
     case 'ci-betanet':
       return {
         networkId: 'shared-test-staging',
         nodeUrl: 'https://rpc.ci-betanet.near.org',
-        contractName: process.env.CONTRACT_NAME,
+        contractName: contractName,
         masterAccount: 'test.near',
       }
     default:
