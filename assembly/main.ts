@@ -4,35 +4,75 @@ import {
 	PersistentMap,
 	u128,
 	ContractPromiseBatch,
+	storage,
 } from 'near-sdk-as'
 
 const len = 4
 
-export const mappedPool = new PersistentMap<string, PersistentDeque<string>>(
-	'mp'
-)
-export const reward = new PersistentMap<string, string>('r')
+export type Pool = PersistentDeque<string>
+export const mappedPool = new PersistentMap<string, Pool>('mp')
+export const mappedReward = new PersistentMap<string, string>('r')
+export const mappedProfile = new PersistentMap<string, Profile>('p')
 
-// export function clearPool(): void {
-// 	for (let i = 0; i < pool.length; i++) {
-// 		pool.popFront()
-// 	}
-// }
+@nearBindgen
+class Profile {
+	userId: string
+	avatar: string
+	bio: string
 
-// export function getPool(): string[] {
-// 	const data: string[] = []
-// 	for (let i = 0; i < pool.length; i++) {
-// 		data.push(pool[i])
-// 	}
-// 	return data
-// }
+	constructor(userId: string, avatar: string, bio: string) {
+		this.userId = userId
+		this.avatar = avatar
+		this.bio = bio
+	}
+}
 
-export function updateProfile() {
+const initKey = 'contract::init'
+const ownerKey = 'contract::owner'
 
+export function init(): void {
+	assert(
+		storage.get<bool>(initKey) != true,
+		'[PieceProtocol] ALREADY_INITIALIZED'
+	)
+	setOwner(context.sender)
+	storage.set<bool>(initKey, true)
+}
+
+export function getOwner(): string {
+	const owner = storage.get<string>(ownerKey)
+	if (owner) {
+		return owner
+	}
+	return ''
+}
+
+export function setOwner(userId: string): boolean {
+	storage.set<string>(ownerKey, userId)
+	return true
+}
+
+export function getProfile(userId: string): Profile | null {
+	const profile = mappedProfile.get(userId)
+	if (profile) {
+		return profile
+	}
+	return null
+}
+
+export function updateProfile(
+	userId: string,
+	avatar: string,
+	bio: string
+): Profile {
+	assert(userId == context.sender, '[PieceProtocol] SENDER_NOT_MATCH')
+	const newProfile = new Profile(userId, avatar, bio)
+	mappedProfile.set(userId, newProfile)
+	return newProfile
 }
 
 export function getReward(userId: string): string {
-	const curBal = reward.get(userId)
+	const curBal = mappedReward.get(userId)
 	if (curBal) {
 		return curBal.toString()
 	}
@@ -40,7 +80,7 @@ export function getReward(userId: string): string {
 }
 
 export function claimReward(userId: string): string {
-	const curBal = reward.get(userId)
+	const curBal = mappedReward.get(userId)
 	if (curBal) {
 		ContractPromiseBatch.create(context.sender).transfer(u128.from(curBal))
 		return rewardSub(userId, curBal)
@@ -50,24 +90,21 @@ export function claimReward(userId: string): string {
 
 export function piece(receiverId: string): void {
 	const userId = context.sender
+	assert(receiverId != userId, '[PieceProtocol] CANNOT_SELF_PIECE')
 	const value = context.attachedDeposit
 	const forOwner: u128 = u128.div10(u128.mul(value, u128.from(9)))
 	const forSupporter: u128 = u128.sub(value, forOwner)
-	const pool = mappedPool.get(receiverId)
-	if (pool) {
-		if (pool.length > 0) {
-			ContractPromiseBatch.create(receiverId).transfer(forOwner)
-			disburse(pool, forSupporter)
-		} else {
-			ContractPromiseBatch.create(receiverId).transfer(value)
-		}
-		pool.pushFront(userId)
-	} else {
+	let pool = mappedPool.get(receiverId)
+	if (!pool) {
 		const poolKey = genPoolKey(receiverId)
 		const newPool = new PersistentDeque<string>(poolKey)
-		newPool.pushFront(userId)
+		newPool.pushFront(getOwner())
 		mappedPool.set(receiverId, newPool)
+		pool = newPool
 	}
+	ContractPromiseBatch.create(receiverId).transfer(forOwner)
+	disburse(pool, forSupporter)
+	pool.pushFront(userId)
 }
 
 function genPoolKey(userId: string): string {
@@ -75,26 +112,26 @@ function genPoolKey(userId: string): string {
 }
 
 function rewardAdd(userId: string, value: string): string {
-	const curBal = reward.get(userId)
+	const curBal = mappedReward.get(userId)
 	const newBal = curBal
 		? u128.add(u128.from(curBal), u128.from(value))
 		: u128.from(value)
-	reward.set(userId, newBal.toString())
+	mappedReward.set(userId, newBal.toString())
 	return newBal.toString()
 }
 
 function rewardSub(userId: string, value: string): string {
-	const curBal = reward.get(userId)
+	const curBal = mappedReward.get(userId)
 	assert(
 		u128.ge(u128.from(curBal), u128.from(value)),
-		'[KarmaProtocol] NOT_ENOUGH_REWARD_BALANCE'
+		'[PieceProtocol] NOT_ENOUGH_REWARD_BALANCE'
 	)
 	const newBal = u128.sub(u128.from(curBal), u128.from(value))
-	reward.set(userId, newBal.toString())
+	mappedReward.set(userId, newBal.toString())
 	return newBal.toString()
 }
 
-function disburse(pool: PersistentDeque<string>, forSupporter: u128): void {
+function disburse(pool: Pool, forSupporter: u128): void {
 	if (pool.length > 0) {
 		const rewardCount: i32 = pool.length > len ? len : pool.length
 		const pieceForSupporter = u128.div(forSupporter, u128.from(rewardCount))
