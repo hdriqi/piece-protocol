@@ -81,11 +81,11 @@ export function getReward(userId: string): string {
 	return '0'
 }
 
-export function claimReward(userId: string): string {
-	const curBal = mappedReward.get(userId)
+export function claimReward(): string {
+	const curBal = mappedReward.get(context.sender)
 	if (curBal) {
 		ContractPromiseBatch.create(context.sender).transfer(u128.from(curBal))
-		return rewardSub(userId, curBal)
+		return rewardSub(context.sender, curBal)
 	}
 	return '0'
 }
