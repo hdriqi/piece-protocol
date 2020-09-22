@@ -32,11 +32,11 @@ const ownerKey = 'contract::owner'
 
 export function init(): void {
 	assert(
-		storage.get<bool>(initKey) != true,
+		storage.get<string>(initKey) == null,
 		'[PieceProtocol] ALREADY_INITIALIZED'
 	)
 	setOwner(context.sender)
-	storage.set<bool>(initKey, true)
+	storage.set<string>(initKey, 'done')
 }
 
 export function getOwner(): string {
@@ -48,6 +48,10 @@ export function getOwner(): string {
 }
 
 export function setOwner(userId: string): boolean {
+	assert(
+		getOwner() == context.sender,
+		'[PieceProtocol] ONLY_OWNER'
+	)
 	storage.set<string>(ownerKey, userId)
 	return true
 }
