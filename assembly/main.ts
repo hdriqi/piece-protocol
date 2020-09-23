@@ -36,7 +36,7 @@ export function init(): void {
 		storage.get<string>(initKey) == null,
 		'[PieceProtocol] ALREADY_INITIALIZED'
 	)
-	setOwner(context.sender)
+	storage.set<string>(ownerKey, context.sender)
 	storage.set<string>(initKey, 'done')
 }
 
