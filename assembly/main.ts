@@ -5,7 +5,7 @@ import {
 	u128,
 	ContractPromiseBatch,
 	storage,
-	AVLTree,
+	PersistentVector,
 } from 'near-sdk-as'
 
 const len = 4
@@ -13,7 +13,8 @@ const len = 4
 export type Pool = PersistentDeque<string>
 export const mappedPool = new PersistentMap<string, Pool>('mp')
 export const mappedReward = new PersistentMap<string, string>('r')
-export const mappedProfile = new AVLTree<string, Profile>('p')
+export const mappedProfile = new PersistentMap<string, Profile>('p')
+export const vectorProfile = new PersistentVector<string>('vp')
 
 @nearBindgen
 class Profile {
@@ -54,6 +55,30 @@ export function setOwner(userId: string): boolean {
 	return true
 }
 
+export function getProfileList(page: i32 = 0): Profile[] {
+	const limit = 8
+	const start = page * limit
+	
+	if (start > vectorProfile.length || vectorProfile.length === 0) {
+		return []
+	}
+	
+	const len =
+	vectorProfile.length - start > limit ? limit : vectorProfile.length - start
+	
+	const profileList: Profile[] = []
+	for (let i = start; i < len; i++) {
+		const userId: string = vectorProfile[i]
+		if (userId) {
+			const profile = mappedProfile.get(userId)
+			if (profile) {
+				profileList.push(profile)
+			}
+		}
+	}
+	return profileList
+}
+
 export function getProfile(userId: string): Profile | null {
 	const profile = mappedProfile.get(userId)
 	if (profile) {
@@ -69,6 +94,10 @@ export function updateProfile(
 ): Profile {
 	assert(userId == context.sender, '[PieceProtocol] SENDER_NOT_MATCH')
 	const newProfile = new Profile(userId, avatar, bio)
+	const exist = mappedProfile.get(userId)
+	if (!exist) {
+		vectorProfile.push(userId)
+	}
 	mappedProfile.set(userId, newProfile)
 	return newProfile
 }
