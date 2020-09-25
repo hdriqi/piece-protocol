@@ -10,11 +10,40 @@ import {
 
 const len = 4
 
+const mappedPoolKey = 'm:pool'
+const mappedRewardKey = 'm:reward'
+const mappedProfileKey = 'm:profile'
+const mappedRewardActivityKey = 'm:reward:activity'
+const mappedBalanceActivityKey = 'm:balance:activity'
+const vectorProfileKey = 'v:profile'
+
 export type Pool = PersistentDeque<string>
-export const mappedPool = new PersistentMap<string, Pool>('mp')
-export const mappedReward = new PersistentMap<string, string>('r')
-export const mappedProfile = new PersistentMap<string, Profile>('p')
-export const vectorProfile = new PersistentVector<string>('vp')
+export type ActivityList = PersistentVector<Activity>
+export const mappedPool = new PersistentMap<string, Pool>(mappedPoolKey)
+export const mappedReward = new PersistentMap<string, string>(mappedRewardKey)
+export const mappedProfile = new PersistentMap<string, Profile>(
+	mappedProfileKey
+)
+export const mappedRewardActivity = new PersistentMap<string, ActivityList>(
+	mappedRewardActivityKey
+)
+export const mappedBalanceActivity = new PersistentMap<string, ActivityList>(
+	mappedBalanceActivityKey
+)
+export const vectorProfile = new PersistentVector<string>(vectorProfileKey)
+
+@nearBindgen
+class Activity {
+	from: string
+	value: string
+	createdAt: u64
+
+	constructor(from: string, value: string) {
+		this.from = from
+		this.value = value
+		this.createdAt = context.blockTimestamp
+	}
+}
 
 @nearBindgen
 class Profile {
@@ -58,14 +87,14 @@ export function setOwner(userId: string): boolean {
 export function getProfileList(page: i32 = 0): Profile[] {
 	const limit = 8
 	const start = page * limit
-	
+
 	if (start > vectorProfile.length || vectorProfile.length === 0) {
 		return []
 	}
-	
+
 	const len =
-	vectorProfile.length - start > limit ? limit : vectorProfile.length - start
-	
+		vectorProfile.length - start > limit ? limit : vectorProfile.length - start
+
 	const profileList: Profile[] = []
 	for (let i = start; i < len; i++) {
 		const userId: string = vectorProfile[i]
@@ -77,6 +106,60 @@ export function getProfileList(page: i32 = 0): Profile[] {
 		}
 	}
 	return profileList
+}
+
+export function getRewardActivityList(
+	userId: string,
+	page: i32 = 0
+): Activity[] {
+	const limit = 8
+	const start = page * limit
+
+	const arr = mappedRewardActivity.get(userId)
+	if (!arr) {
+		return []
+	}
+	if (start > arr.length || arr.length === 0) {
+		return []
+	}
+
+	const len = arr.length - start > limit ? limit : arr.length - start
+
+	const activityList: Activity[] = []
+	for (let i = len - 1; i >= start; i--) {
+		const activity: Activity = arr[i]
+		if (activity) {
+			activityList.push(activity)
+		}
+	}
+	return activityList
+}
+
+export function getBalanceActivityList(
+	userId: string,
+	page: i32 = 0
+): Activity[] {
+	const limit = 8
+	const start = page * limit
+
+	const arr = mappedBalanceActivity.get(userId)
+	if (!arr) {
+		return []
+	}
+	if (start > arr.length || arr.length === 0) {
+		return []
+	}
+
+	const len = arr.length - start > limit ? limit : arr.length - start
+
+	const activityList: Activity[] = []
+	for (let i = start; i < len; i++) {
+		const activity: Activity = arr[i]
+		if (activity) {
+			activityList.push(activity)
+		}
+	}
+	return activityList
 }
 
 export function getProfile(userId: string): Profile | null {
@@ -114,6 +197,16 @@ export function claimReward(): string {
 	const curBal = mappedReward.get(context.sender)
 	if (curBal) {
 		ContractPromiseBatch.create(context.sender).transfer(u128.from(curBal))
+		let receiverActivityList = mappedBalanceActivity.get(context.sender)
+		const newActivity = new Activity(context.contractName, curBal)
+
+		if (!receiverActivityList) {
+			const key = genActivityListKey(context.sender, 'balance')
+			const newActivityList = new PersistentVector<Activity>(key)
+			receiverActivityList = newActivityList
+		}
+		receiverActivityList.push(newActivity)
+		mappedBalanceActivity.set(context.sender, receiverActivityList)
 		return rewardSub(context.sender, curBal)
 	}
 	return '0'
@@ -133,13 +226,34 @@ export function piece(receiverId: string): void {
 		mappedPool.set(receiverId, newPool)
 		pool = newPool
 	}
+
 	ContractPromiseBatch.create(receiverId).transfer(forOwner)
-	disburse(pool, forSupporter)
+	let receiverActivityList = mappedBalanceActivity.get(receiverId)
+	const newActivity = new Activity(context.sender, forOwner.toString())
+
+	if (!receiverActivityList) {
+		const key = genActivityListKey(receiverId, 'balance')
+		const newActivityList = new PersistentVector<Activity>(key)
+		receiverActivityList = newActivityList
+	}
+	receiverActivityList.push(newActivity)
+	mappedBalanceActivity.set(receiverId, receiverActivityList)
+
+	disburse(receiverId, pool, forSupporter)
 	pool.pushFront(userId)
+	mappedPool.set(receiverId, pool)
+}
+
+function genActivityListKey(userId: string, type: string): string {
+	if (type == 'balance') {
+		return 'activity' + '::' + mappedBalanceActivityKey + '::' + userId
+	} else {
+		return 'activity' + '::' + mappedRewardActivityKey + '::' + userId
+	}
 }
 
 function genPoolKey(userId: string): string {
-	return 'pool' + '::' + userId
+	return 'pool' + '::' + mappedPoolKey + '::' + userId
 }
 
 function rewardAdd(userId: string, value: string): string {
@@ -162,7 +276,7 @@ function rewardSub(userId: string, value: string): string {
 	return newBal.toString()
 }
 
-function disburse(pool: Pool, forSupporter: u128): void {
+function disburse(receiverId: string, pool: Pool, forSupporter: u128): void {
 	if (pool.length > 0) {
 		const rewardCount: i32 = pool.length > len ? len : pool.length
 		const pieceForSupporter = u128.div(forSupporter, u128.from(rewardCount))
@@ -170,6 +284,20 @@ function disburse(pool: Pool, forSupporter: u128): void {
 			const userId = pool.popFront()
 			rewardAdd(userId, pieceForSupporter.toString())
 			pool.pushBack(userId)
+
+			let receiverActivityList = mappedRewardActivity.get(userId)
+			const newActivity = new Activity(
+				receiverId,
+				pieceForSupporter.toString()
+			)
+
+			if (!receiverActivityList) {
+				const key = genActivityListKey(userId, 'reward')
+				const newActivityList = new PersistentVector<Activity>(key)
+				receiverActivityList = newActivityList
+			}
+			receiverActivityList.push(newActivity)
+			mappedRewardActivity.set(userId, receiverActivityList)
 		}
 	}
 }

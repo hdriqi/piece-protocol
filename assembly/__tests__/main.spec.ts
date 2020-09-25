@@ -1,6 +1,6 @@
 // import { genUser, getReward, piece } from "../main"
 
-import { getProfile, getProfileList, updateProfile } from '../main'
+import { getProfile, getProfileList, piece, updateProfile } from '../main'
 
 describe('Main ', () => {
 	// it("should create run piece", () => {
