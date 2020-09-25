@@ -153,7 +153,7 @@ export function getBalanceActivityList(
 	const len = arr.length - start > limit ? limit : arr.length - start
 
 	const activityList: Activity[] = []
-	for (let i = start; i < len; i++) {
+	for (let i = len - 1; i >= start; i--) {
 		const activity: Activity = arr[i]
 		if (activity) {
 			activityList.push(activity)
