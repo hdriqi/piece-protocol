@@ -1188,7 +1188,7 @@ jest-util@^26.3.0:
     is-ci "^2.0.0"
     micromatch "^4.0.2"
 
-js-base64@^3.4.3:
+js-base64@^3.4.3, js-base64@^3.5.2:
   version "3.5.2"
   resolved "https://registry.yarnpkg.com/js-base64/-/js-base64-3.5.2.tgz#3cc800e4f10812b55fb5ec53e7cabaef35dc6d3c"
   integrity sha512-VG2qfvV5rEQIVxq9UmAVyWIaOdZGt9M16BLu8vFkyWyhv709Hyg4nKUb5T+Ru+HmAr9RHdF+kQDKAhbJlcdKeQ==

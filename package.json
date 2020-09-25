@@ -4,11 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev:contract": "NODE_ENV=development nodemon --watch assembly -e ts --exec asp",
-    "build:contract": "asb",
-    "deploy:contract": "NODE_ENV=development npm run build:contract && near dev-deploy"
+    "dev": "NODE_ENV=development nodemon --watch assembly -e ts --exec asp",
+    "build": "asb",
+    "deploy:dev": "NODE_ENV=development npm run build && near dev-deploy",
+    "deploy:staging": "NODE_ENV=staging npm run build && near deploy dev-v1.piece.testnet",
+    "deploy:prod": "NODE_ENV=production npm run build && near deploy v1.piece.testnet"
   },
   "dependencies": {
+    "js-base64": "^3.5.2",
     "near-api-js": "^0.29.0"
   },
   "devDependencies": {
