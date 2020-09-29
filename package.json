@@ -1,5 +1,5 @@
 {
-  "name": "karma-protocol",
+  "name": "piece-protocol",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -11,7 +11,6 @@
     "deploy:prod": "NODE_ENV=production npm run build && near deploy v1.piece.testnet"
   },
   "dependencies": {
-    "js-base64": "^3.5.2",
     "near-api-js": "^0.29.0"
   },
   "devDependencies": {
